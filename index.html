@@ -2,27 +2,215 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>アンケートフォーム</title>
+  <title>コメントページ</title>
   <meta name="robots" content="noindex, nofollow">
   <style>
     body {
       font-family: sans-serif;
-      background-color: #f9f9f9;
       padding: 2em;
+      background-color: #f9f9f9;
       text-align: center;
     }
-    iframe {
+
+    .btn {
+      background-color: #4CAF50;
+      color: white;
       border: none;
-      width: 100%;
+      padding: 10px 20px;
+      font-size: 16px;
+      cursor: pointer;
+      border-radius: 20px;
+    }
+
+    #filterToggle {
+      margin-top: 2em;
+      cursor: pointer;
+      font-size: 16px;
+      color: #333;
+    }
+
+    #filterContainer {
+      display: none;
+      margin-top: 1em;
+      text-align: left;
       max-width: 640px;
-      height: 800px;
+      margin-left: auto;
+      margin-right: auto;
+      background: #fff;
+      padding: 1em;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+    }
+
+    #comments {
+      margin-top: 2em;
+      max-width: 640px;
+      margin-left: auto;
+      margin-right: auto;
+      background: #fff;
+      padding: 1em;
+      border-radius: 8px;
+      box-shadow: 0 0 5px rgba(0,0,0,0.1);
+      text-align: left;
+    }
+
+    .comment {
+      border-bottom: 1px solid #ddd;
+      padding: 0.5em 0;
+    }
+
+    /* モーダル関連 */
+    #modalOverlay {
+      display: none;
+      position: fixed;
+      top: 0; left: 0;
+      width: 100vw; height: 100vh;
+      background: rgba(0, 0, 0, 0.5);
+      z-index: 998;
+    }
+
+    #formContainer {
+      display: none;
+      position: fixed;
+      top: 50%; left: 50%;
+      transform: translate(-50%, -50%);
+      z-index: 999;
+    }
+
+    #modalContent {
+      background: white;
+      padding: 1em;
+      border-radius: 10px;
+      width: 90vw;
+      max-width: 700px;
+      max-height: 90vh;
+      overflow: auto;
+      box-shadow: 0 0 10px rgba(0,0,0,0.3);
+      position: relative;
+    }
+
+    #closeBtn {
+      position: absolute;
+      top: 10px; right: 10px;
+      background: #ccc;
+      border: none;
+      font-size: 20px;
+      cursor: pointer;
+      border-radius: 50%;
+      width: 30px; height: 30px;
     }
   </style>
 </head>
 <body>
-  <h1>アンケートにご協力ください📝</h1>
-  <p>以下のフォームにご記入ください。</p>
+  <h1>コメントページ📝</h1>
+  <button class="btn" onclick="showForm()">コメントを書く</button>
 
-  <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSc2WgysDW59THAeJLVBIiuQc0C7eQburcoH1pQTn938jxT7qA/viewform?embedded=true" allowfullscreen></iframe>
+  <div id="filterToggle" onclick="toggleFilter()">▽ スレッドで絞り込む</div>
+
+  <div id="filterContainer">
+    <div id="threadCheckboxes">読み込み中…</div>
+  </div>
+
+  <div id="comments">
+    <h2>みんなのコメント</h2>
+    <div id="commentList">読み込み中…</div>
+  </div>
+
+  <!-- モーダル背景 -->
+  <div id="modalOverlay" onclick="closeForm()"></div>
+
+  <!-- モーダル本体 -->
+  <div id="formContainer">
+    <div id="modalContent">
+      <button id="closeBtn" onclick="closeForm()">×</button>
+      <iframe src="https://docs.google.com/forms/d/e/1FAIpQLSc2WgysDW59THAeJLVBIiuQc0C7eQburcoH1pQTn938jxT7qA/viewform?embedded=true" allowfullscreen></iframe>
+    </div>
+  </div>
+
+  <script>
+    let allComments = [];
+
+    function showForm() {
+      document.getElementById("modalOverlay").style.display = "block";
+      document.getElementById("formContainer").style.display = "block";
+    }
+
+    function closeForm() {
+      document.getElementById("modalOverlay").style.display = "none";
+      document.getElementById("formContainer").style.display = "none";
+    }
+
+    function toggleFilter() {
+      const container = document.getElementById("filterContainer");
+      container.style.display = container.style.display === "none" ? "block" : "none";
+    }
+
+    async function fetchComments() {
+      const url = "https://script.google.com/macros/s/AKfycbyzhi4kk3qrHBYRi7j1lVCI3v3nD9b7wT6M1qWdDzXVSn8hjI1EVpzeWWrzAVPhgiw5Bg/exec";
+
+      try {
+        const res = await fetch(url);
+        const data = await res.json();
+        allComments = data.filter(entry =>
+          entry["公開"] === true || entry["公開"] === "TRUE" || entry["公開"] === "✓"
+        );
+        generateThreadFilters();
+        renderComments();
+      } catch (err) {
+        document.getElementById("commentList").textContent = "コメントの読み込みに失敗しました。";
+        console.error(err);
+      }
+    }
+
+    function generateThreadFilters() {
+      const threads = [...new Set(allComments.map(entry => entry["スレッド"]).filter(Boolean))];
+      const container = document.getElementById("threadCheckboxes");
+      container.innerHTML = "";
+
+      threads.forEach(thread => {
+        const label = document.createElement("label");
+        label.innerHTML = `<input type="checkbox" class="threadCheckbox" value="${thread}" checked> ${thread}`;
+        container.appendChild(label);
+        container.appendChild(document.createElement("br"));
+      });
+
+      document.querySelectorAll(".threadCheckbox").forEach(cb => {
+        cb.addEventListener("change", renderComments);
+      });
+    }
+
+    function getSelectedThreads() {
+      const checkboxes = document.querySelectorAll(".threadCheckbox");
+      const selected = [];
+      checkboxes.forEach(cb => {
+        if (cb.checked) selected.push(cb.value);
+      });
+      return selected;
+    }
+
+    function renderComments() {
+      const selectedThreads = getSelectedThreads();
+      const commentList = document.getElementById("commentList");
+      commentList.innerHTML = "";
+
+      const filtered = allComments.filter(entry =>
+        selectedThreads.includes(entry["スレッド"])
+      );
+
+      if (filtered.length === 0) {
+        commentList.textContent = "選択されたスレッドにはコメントがありません。";
+        return;
+      }
+
+      filtered.forEach(entry => {
+        const div = document.createElement("div");
+        div.className = "comment";
+        div.innerHTML = `<strong>${entry["お名前"] || "名無し"}</strong>（${entry["スレッド"] || "スレッド不明"}）<br>${entry["内容"] || ""}`;
+        commentList.appendChild(div);
+      });
+    }
+
+    fetchComments();
+  </script>
 </body>
 </html>
